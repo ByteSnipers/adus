@@ -152,7 +152,7 @@ function apk_dump {
 
     # Dump APK
     log INFO "Dumping $1 to $DIR_SOURCE ... "
-    cmd="java -jar $BIN_APKTOOL d -d -f $1 -o $DIR_SOURCE"
+    cmd="java -jar $BIN_APKTOOL d -f $1 -o $DIR_SOURCE"
 
     # Check for verbosity
     if (( ! verbose )); then
