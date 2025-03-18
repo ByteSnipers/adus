@@ -54,7 +54,7 @@ BIN_UNZIP=$(check_command unzip)
 
 
 BIN_APKTOOL=$DIR_TOOLS/apktool/apktool-cli.jar
-BIN_SIGNAPK=$DIR_TOOLS/signapk/signapk.jar
+BIN_SIGNAPK=$DIR_TOOLS/signapk/apksigner 
 BIN_DEX2JAR=$DIR_TOOLS/dex2jar/current/d2j-dex2jar.sh
 
 verbose=1
@@ -115,18 +115,20 @@ function apk_sign {
     create_dir $DIR_TOOLS
 
     # Check if signapk utility exists
-    if ! check_file $BIN_SIGNAPK; then
-        download_sign_tool
-    fi
+    #if ! check_file $BIN_SIGNAPK; then
+    #    download_sign_tool
+    #fi
 
     # Sign APK
     signed_apk=`basename $1 .apk`.SIGNED.apk
     log INFO "Signing $1 ..."
-    cmd="$BIN_JAVA -jar $BIN_SIGNAPK \
-              $DIR_SIGNAPK/testkey.x509.pem \
-              $DIR_SIGNAPK/testkey.pk8 \
-              $1 \
-              $signed_apk"
+
+    cmd="$BIN_SIGNAPK sign \
+              --key $DIR_SIGNAPK/testkey.pk8 \
+              --cert $DIR_SIGNAPK/testkey.x509.pem \
+              $1"
+              #$signed_apk"
+
 
     # Check for verbosity
     if (( ! verbose )); then
@@ -139,7 +141,7 @@ function apk_sign {
     if [ $? -ne 0 ]; then
         log ERROR "Couldn't sign APK."
     else
-        log INFO "Success! $signed_apk is your signed APK."
+        log INFO "Success! $1 is your signed APK."
     fi
 }
 
