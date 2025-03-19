@@ -41,7 +41,7 @@ function check_command {
 ## Configuration stuff
 
 # Dirctories
-CWD=$( cd "$( dirname $( readlink "${BASH_SOURCE[0]}" ))" && pwd )
+CWD=$( cd "$( dirname $( realpath "${BASH_SOURCE[0]}" ))" && pwd )
 DIR_TOOLS=$CWD/tools
 DIR_UNPACK=./unpacked
 DIR_SOURCE=./source
@@ -56,6 +56,7 @@ BIN_UNZIP=$(check_command unzip)
 BIN_APKTOOL=$DIR_TOOLS/apktool/apktool-cli.jar
 BIN_SIGNAPK=$DIR_TOOLS/signapk/apksigner 
 BIN_DEX2JAR=$DIR_TOOLS/dex2jar/current/d2j-dex2jar.sh
+BIN_ZIPALIGN=$DIR_TOOLS/zipalign/zipalign
 
 verbose=1
 
@@ -126,9 +127,8 @@ function apk_sign {
     cmd="$BIN_SIGNAPK sign \
               --key $DIR_SIGNAPK/testkey.pk8 \
               --cert $DIR_SIGNAPK/testkey.x509.pem \
-              $1"
-              #$signed_apk"
-
+              --in $1 \
+              --out $signed_apk"
 
     # Check for verbosity
     if (( ! verbose )); then
@@ -141,7 +141,7 @@ function apk_sign {
     if [ $? -ne 0 ]; then
         log ERROR "Couldn't sign APK."
     else
-        log INFO "Success! $1 is your signed APK."
+        log INFO "Success! $signed_apk is your signed APK."
     fi
 }
 
@@ -241,6 +241,48 @@ function apk_dex2jar {
     fi
 }
 
+## zipalign
+# solution for this issue: Failure [-124: Failed parse during installPackageLI: Targeting R+ (version 30 and above) requires the resources.arsc of installed APKs to be stored uncompressed and aligned on a 4-byte boundary
+#
+#   if you try to install the singed app and the following error appears 
+#   https://stackoverflow.com/questions/69667830/targeting-r-version-30-and-above-requires-the-resources-arsc-of-installed-apk
+#   
+#   https://developer.android.com/tools/zipalign
+#     # zipalign is a part of build-tools
+#     # check version and replace r34 with the latest one: https://developer.android.com/tools/releases/build-tools
+#     # URL example version + RC: 'https://dl.google.com/android/repository/build-tools_r34-rc1-linux.zip',
+
+function zipalign {
+
+    # Sign APK
+    # signed_apk=`basename $1 .apk`.SIGNED.apk
+    log INFO "Run zipalign $1 ..."
+
+    # zipalign -p -f -v 4 1.apk new.apk" 
+    # it is reuqired to run zipalign twice
+    cmd="$BIN_ZIPALIGN -p -f 4 $1 $1.tmp" 
+    cmd2="$BIN_ZIPALIGN -p -f 4 $1.tmp $1" 
+
+    # Check for verbosity
+    if (( ! verbose )); then
+        cmd="$cmd > /dev/null 2>&1"
+        cmd2="$cmd2 > /dev/null 2>&1"
+    fi
+
+    eval $cmd
+    eval $cmd2
+    rm  $1.tmp
+
+    # Check for errors
+    if [ $? -ne 0 ]; then
+        log ERROR "Couldn't zipalign APK."
+    else
+        log INFO "Success! $1 the APK archive is aligned."
+    fi
+
+
+}
+
 ## Clean directories
 function clean {
     log INFO "Cleaning directories (unpack/source) ..."
@@ -281,17 +323,19 @@ function adus_usage {
     echo -ne " -d <app_path> \t\t\t Dump APK to $DIR_SOURCE\n"
     echo -ne " -s <app_path> \t\t\t Sign APK using test certificate\n"
     echo -ne " -u <app_path> \t\t\t Unpack APK to $DIR_UNPACK\n"
+    echo -ne " -z <app_path> \t\t\t Zipalign APK\n"
     echo -ne " -x <dex_path> \t\t\t Convert DEX to JAR\n"
     echo -ne " -q \t\t\t\t Be quite. Deactivate verbosity.\n"
     echo -ne " -0 <app_path> \t\t\t Dump (-d) and unpack (-u) APK\n"
     echo -ne " -1 <app_path> \t\t\t Build (-b) and sign (-s)\n"
+    echo -ne " -2 <app_path> \t\t\t Build (-b), zipalign (-z) and sign (-s) (Required for Android 11+)\n"
     exit 1
 }
 # -----------------------------------------------------------------------------
 
 
 # Check for arguments
-while getopts ":b:d:s:u:x:0:1:q:c" o; do
+while getopts ":b:d:s:u:z:x:0:1:2:q:c" o; do
     case "${o}" in
         h|\?)
             adus_usage
@@ -316,6 +360,10 @@ while getopts ":b:d:s:u:x:0:1:q:c" o; do
             u=${OPTARG}
             apk_unpack $u
             ;;
+        z)
+            z=${OPTARG}
+            zipalign $z
+            ;;
         x)
             dex=${OPTARG}
             apk_dex2jar $dex
@@ -331,6 +379,12 @@ while getopts ":b:d:s:u:x:0:1:q:c" o; do
         1)
             apk_path=${OPTARG}
             apk_build $apk_path
+            apk_sign $apk_path
+            ;;
+        2)
+            apk_path=${OPTARG}
+            apk_build $apk_path
+            zipalign $apk_path
             apk_sign $apk_path
             ;;
         *)
