@@ -42,11 +42,12 @@ Available options:
  -d <app_path>           Dump APK to ./source
  -s <app_path>           Sign APK using test certificate
  -u <app_path>           Unpack APK to ./unpacked
+ -z <app_path> 			     Zipalign APK
  -x <dex_path>           Convert DEX to JAR
  -q                      Be quite. Deactivate verbosity.
  -0 <app_path>           Dump (-d) and unpack (-u) APK
  -1 <app_path>           Build (-b) and sign (-s)
-
+ -2 <app_path> 			 Build (-b), zipalign (-z) and sign (-s) (Required for Android 11+)
 
 ~~~
 
